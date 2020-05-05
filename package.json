@@ -1,6 +1,6 @@
 {
-  "name": "lotion-router",
-  "version": "2.1.0",
+  "name": "@davvidess/lotion-router",
+  "version": "2.1.1",
   "description": "Lotion handler tree",
   "main": "index.js",
   "scripts": {

@@ -2,7 +2,7 @@
 
 const old = require('old')
 
-function Router (routes) {
+function Router(routes) {
   if (routes == null || typeof routes !== 'object') {
     throw Error('Must provide routes object')
   }
@@ -11,7 +11,7 @@ function Router (routes) {
   let initializers = getAllHandlers(routes, 'initializers')
 
   // lotion tx handler
-  function txHandler (state, tx, context) {
+  function txHandler(state, tx, context) {
     if (tx.type == null) {
       throw Error('Must provide type')
     }
@@ -27,7 +27,7 @@ function Router (routes) {
     }
     // special case: single function is tx handler
     if (typeof route === 'function') {
-      route = { transactionHandlers: [ route ] }
+      route = { transactionHandlers: [route] }
     }
     if (!route.transactionHandlers) {
       throw Error(`No tx handlers defined for route "${tx.type}"`)
@@ -37,28 +37,33 @@ function Router (routes) {
 
     setContextProperties(state, context, tx.type)
 
-    for (let handler of route.transactionHandlers) {
-      handler(substate, tx, context)
-    }
+    const result = route.transactionHandlers.reduce((results, handler) => {
+      const currResult = handler(substate, tx, context)
+      return { ...results, ...currResult }
+    }, {})
+
+    return result
   }
 
   // lotion block handler
-  function blockHandler (state, context) {
+  function blockHandler(state, context) {
     setContextProperties(state, context)
     for (let { route, handlers } of blockHandlers) {
       let substate = getSubstate(state, route)
-      handlers.forEach((handler) => handler(substate, context))
+      handlers.forEach(handler => handler(substate, context))
     }
   }
 
   // lotion initialization handler
-  function initializer (state, context) {
+  function initializer(state, context) {
     for (let route in routes) {
       let substate = state[route]
 
       if (routes[route].initialState != null) {
         if (route in state) {
-          throw Error(`Route "${route}" has initialState, but state.${route} already exists`)
+          throw Error(
+            `Route "${route}" has initialState, but state.${route} already exists`
+          )
         }
         substate = routes[route].initialState
       }
@@ -70,31 +75,31 @@ function Router (routes) {
 
     for (let { route, handlers } of initializers) {
       let substate = state[route]
-      handlers.forEach((handler) => handler(substate, context))
+      handlers.forEach(handler => handler(substate, context))
     }
   }
 
-  function setContextProperties (state, context, currentRoute) {
+  function setContextProperties(state, context, currentRoute) {
     // get exported methods from other routes
     // TODO: do this once and just update the closure variables (state/context)
     let exportedMethods = {}
-    for (let [ routeName, route ] of Object.entries(routes)) {
+    for (let [routeName, route] of Object.entries(routes)) {
       if (currentRoute != null && routeName === currentRoute) continue
       if (route.methods == null) continue
       // define getter, so we bind the methods as they are accessed
       Object.defineProperty(exportedMethods, routeName, {
-        get () {
+        get() {
           let substate = getSubstate(state, routeName)
           // TODO: use a more complete way of making object read-only
           return new Proxy(route.methods, {
-            get (obj, key) {
+            get(obj, key) {
               if (typeof obj[key] !== 'function') {
                 throw Error('Got non-function in methods')
               }
               // use the external route's own substate as first arg
               return obj[key].bind(null, substate)
             },
-            set () {
+            set() {
               throw Error('Route methods are read-only')
             }
           })
@@ -111,20 +116,20 @@ function Router (routes) {
 
   // returns a lotion module
   return {
-    transactionHandlers: [ txHandler ],
-    blockHandlers: [ blockHandler ],
-    initializers: [ initializer ]
+    transactionHandlers: [txHandler],
+    blockHandlers: [blockHandler],
+    initializers: [initializer]
     // TODO: export methods
   }
 }
 
-function getAllHandlers (routes, type) {
+function getAllHandlers(routes, type) {
   let output = []
 
   let addHandlers = (routeName, module) => {
     // special case: single function is tx handler
     if (typeof module === 'function') {
-      module = { transactionHandlers: [ module ] }
+      module = { transactionHandlers: [module] }
     }
 
     if (module[type] == null) return
@@ -142,7 +147,7 @@ function getAllHandlers (routes, type) {
   return output
 }
 
-function getSubstate (state, key) {
+function getSubstate(state, key) {
   let substate = state[key]
   if (substate == null) {
     throw Error(`Substate "${key}" does not exist`)
